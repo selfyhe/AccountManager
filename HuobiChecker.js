@@ -21,6 +21,7 @@ var States = {
 	"canceled":"已撤销"
 }
 var Sources = {
+	"web":"网页 #FF0000",
 	"spot-app":"火币APP #FF0000",
 	"otc-app":"法币APP #FF0000",
 	"spot-api":"API",
