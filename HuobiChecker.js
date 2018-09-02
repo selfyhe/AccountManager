@@ -30,7 +30,7 @@ var Sources = {
 
 //转换数据
 function changeNum(str){
-    return parseFloat(str).toFixed(8)
+	return parseFloat((parseFloat(str)+0).toFixed(8));
 }
 
 //转换交易对
@@ -87,24 +87,67 @@ function getAccounts(){
 	}
 }
 
+//获取当前所有币种行情
+function getTickers(){
+	var tickers = [];
+	var json = exchange.IO("api","GET","/market/tickers","");
+	if(isJSON(json) && json.status == "ok"){
+		var list = json.data;
+		for(var i=0;i<list.length;i++){
+			tickers.push(list[i]);
+		}
+	}
+	return tickers;
+}
+
+function getSymbolLast(tickers, symbol){
+	var last = 0;
+	if(symbol == 'usdtusdt'){
+		last = 1;
+	}else if(symbol == 'btcbtc'){
+		last = 1;
+	}else if(symbol == 'usdtbtc'){
+		last = (1/parseFloat(getSymbolLast(tickers, "btcusdt"))).toFixed(8);
+	}else{
+		for(var i=0;i<tickers.length;i++){
+			if(tickers[i].symbol == symbol){
+				last = tickers[i].close;
+			}
+		}
+	}
+	return last;
+}
+
 //查询交易账户余额
 function getAccountSpot(){
 	var balances = [];
+	var tickers = getTickers();
 	var json = exchange.IO("api","GET","/v1/account/accounts/"+AccountIDs.spot+"/balance","");
 	if(isJSON(json) && json.status == "ok"){
 		var list = json.data.list;
+		var usdtallvalue = 0;
+		var btcallvalue = 0;
 		for(var i=0;i<list.length;i+=2){
+			//['币种','可用','冻结','USDT价格','USDT价值','BTC价格','BTC价值']
 			var trade = list[i];
 			var frozen = list[i+1];
 			if(trade.currency == frozen.currency && (trade.balance != "0" || frozen.balance != "0")){
                 var t = changeNum(trade.balance);
                 var f = changeNum(frozen.balance);
                 if(t > 0 || f > 0){
-				    var item = [trade.currency.toUpperCase(),t,f];
+					var usdtprice = getSymbolLast(tickers, trade.currency+"usdt");
+					var btcprice = getSymbolLast(tickers, trade.currency+"btc");
+					var stocks = parseFloat(trade.balance)+parseFloat(frozen.balance);
+					var usdtvalue = stocks*parseFloat(usdtprice);
+					var btcvalue = stocks*parseFloat(btcprice);
+					usdtallvalue += usdtvalue;
+					btcallvalue += btcvalue;
+				    var item = [trade.currency.toUpperCase(),t,f,usdtprice,changeNum(usdtvalue),btcprice,changeNum(btcvalue)];
 				    balances.push(item);
                 }
 			}
 		}
+		balances.push(['合计',0,0,0,changeNum(usdtallvalue),0,changeNum(btcallvalue)]);
 	}
 	return balances;
 }
@@ -248,7 +291,7 @@ function showStatus(){
 	var accounttable1 = {};
 	accounttable1.type="table";
 	accounttable1.title = "交易区账户资产";
-	accounttable1.cols = ['币种','可用','冻结'];
+	accounttable1.cols = ['币种','可用','冻结','USDT价格','USDT价值','BTC价格','BTC价值'];
 	accounttable1.rows = getAccountSpot();
 	AccountTables.push(accounttable1);
 	var accounttable2 = {};
